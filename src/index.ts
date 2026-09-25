@@ -57,6 +57,8 @@ app.onError((err, c) => {
 
 // Routes
 app.route("/api/comment", commentRoutes);
+// Compatibility path used by Waline's RecentComments widget.
+app.route("/comment", commentRoutes);
 app.route("/api/article", articleRoutes);
 app.route("/api/user", userRoutes);
 app.route("/api/token", tokenRoutes);
