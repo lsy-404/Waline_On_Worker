@@ -109,18 +109,17 @@ describe("GET /api/comment?path= — comment list", () => {
 	});
 });
 
-// ─── GET /api/comment?type=recent ────────────────────────────────────────────
+// ─── GET /comment?type=recent (legacy RecentComments endpoint) ───────────────
 
-describe("GET /api/comment?type=recent", () => {
+describe("GET /comment?type=recent", () => {
 	it("returns recent approved comments across all paths", async () => {
 		await createComment(db, { url: "/a" });
 		await createComment(db, { url: "/b" });
-		const body = await json(
-			await api.get("/api/comment", { params: { type: "recent" } }),
+		const comments = await json(
+			await api.get("/comment", { params: { type: "recent" } }),
 		);
-		expect(body.errno).toBe(0);
-		expect(Array.isArray(body.data)).toBe(true);
-		expect(body.data.length).toBeGreaterThanOrEqual(2);
+		expect(Array.isArray(comments)).toBe(true);
+		expect(comments.length).toBeGreaterThanOrEqual(2);
 	});
 });
 

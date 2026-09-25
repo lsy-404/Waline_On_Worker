@@ -539,13 +539,11 @@ async function getRecentComments(c: any) {
 		.all();
 
 	const userMap = await fetchCommentUsers(c.env.DB, result.results);
-	return c.json({
-		errno: 0,
-		errmsg: "",
-		data: await Promise.all(
+	return c.json(
+		await Promise.all(
 			result.results.map((r: any) => formatComment(r, false, userMap)),
 		),
-	});
+	);
 }
 
 async function getCommentCount(c: any) {
