@@ -10,21 +10,17 @@ if [ -f "temp/wrangler.private.toml" ]; then
 fi
 
 # 检查依赖
-command -v npx >/dev/null 2>&1 || { echo "错误: 需要安装 Node.js (npx)"; exit 1; }
+command -v pnpm >/dev/null 2>&1 || { echo "错误: 请启用 Corepack 并安装 pnpm"; exit 1; }
 
 # 安装依赖
 echo "[1/5] 安装依赖..."
-if command -v pnpm >/dev/null 2>&1; then
-  pnpm install
-else
-  npm install
-fi
+pnpm install --frozen-lockfile
 
 # 检查 wrangler 登录状态
 echo ""
 echo "[2/5] 检查 Wrangler 登录状态..."
-if ! npx wrangler whoami >/dev/null 2>&1; then
-  echo "未登录 Wrangler，请先运行: npx wrangler login"
+if ! pnpm exec wrangler whoami >/dev/null 2>&1; then
+  echo "未登录 Wrangler，请先运行: pnpm exec wrangler login"
   exit 1
 fi
 
@@ -33,7 +29,7 @@ echo ""
 echo "[3/5] 检查 D1 数据库..."
 if grep -q 'database_id = ""' "$CONFIG" 2>/dev/null; then
   echo "创建 D1 数据库..."
-  DB_OUTPUT=$(npx wrangler d1 create waline-db --config "$CONFIG" 2>&1)
+  DB_OUTPUT=$(pnpm exec wrangler d1 create waline-db --config "$CONFIG" 2>&1)
   echo "$DB_OUTPUT"
 
   DB_ID=$(echo "$DB_OUTPUT" | grep -oP 'database_id\s*=\s*"\K[^"]+')
@@ -48,7 +44,7 @@ fi
 # 初始化数据库
 echo ""
 echo "[4/5] 初始化数据库 Schema..."
-npx wrangler d1 execute waline-db --file=./schema.sql --remote --config "$CONFIG"
+pnpm exec wrangler d1 execute waline-db --file=./schema.sql --remote --config "$CONFIG"
 
 # 设置 JWT_SECRET（如果未设置）
 echo ""
@@ -57,14 +53,14 @@ echo "是否需要生成并设置 JWT_SECRET? (y/N)"
 read -r REPLY
 if [[ "$REPLY" =~ ^[Yy]$ ]]; then
   JWT_SECRET=$(head -c 32 /dev/urandom | base64 | tr -d '/+=' | head -c 32)
-  echo "$JWT_SECRET" | npx wrangler secret put JWT_SECRET --config "$CONFIG"
+  echo "$JWT_SECRET" | pnpm exec wrangler secret put JWT_SECRET --config "$CONFIG"
   echo "JWT_SECRET 已设置"
 fi
 
 # 部署
 echo ""
 echo "=== 开始部署 ==="
-npx wrangler deploy --config "$CONFIG"
+pnpm exec wrangler deploy --config "$CONFIG"
 
 echo ""
 echo "=== 部署完成 ==="

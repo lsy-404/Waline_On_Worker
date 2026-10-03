@@ -104,9 +104,9 @@ cd Waline_On_Worker
 pnpm install
 
 # 创建 D1 数据库并编辑 wrangler.toml
-npx wrangler d1 create waline-db
+pnpm exec wrangler d1 create waline-db
 pnpm run db:init
-npx wrangler secret put JWT_SECRET
+pnpm exec wrangler secret put JWT_SECRET
 pnpm run deploy
 ```
 

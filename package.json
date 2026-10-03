@@ -3,6 +3,7 @@
 	"version": "1.0.0",
 	"description": "Waline-compatible comment system backend running on Cloudflare Workers with D1",
 	"type": "module",
+	"packageManager": "pnpm@10.34.6",
 	"scripts": {
 		"dev": "wrangler dev",
 		"deploy": "wrangler deploy",

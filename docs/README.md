@@ -40,7 +40,7 @@ chmod +x deploy.sh
 pnpm install
 
 # 2. 创建 D1 数据库
-npx wrangler d1 create waline-db
+pnpm exec wrangler d1 create waline-db
 
 # 3. 编辑 wrangler.toml，填入上一步返回的 database_id
 
@@ -48,7 +48,7 @@ npx wrangler d1 create waline-db
 pnpm run db:init
 
 # 5. 设置 JWT 密钥
-npx wrangler secret put JWT_SECRET
+pnpm exec wrangler secret put JWT_SECRET
 # 输入一个随机字符串作为密钥
 
 # 6. 部署
@@ -157,10 +157,10 @@ OAuth 流程通过外部 OAuth 代理服务（默认 `https://oauth.lithub.cc`�
 
 ```bash
 # 导出为 SQL
-npx wrangler d1 export <database-name> --remote --output=backup.sql
+pnpm exec wrangler d1 export <database-name> --remote --output=backup.sql
 
 # 从 SQL 导入
-npx wrangler d1 execute <database-name> --remote --file=backup.sql
+pnpm exec wrangler d1 execute <database-name> --remote --file=backup.sql
 ```
 
 > [!WARNING]
