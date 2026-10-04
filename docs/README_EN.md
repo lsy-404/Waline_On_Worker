@@ -194,6 +194,17 @@ Recommended solutions:
 | SITE_NAME      | Site name                         | Waline  |
 | SITE_URL       | Site URL                          | None    |
 | SECURE_DOMAINS | Allowed domains (comma-separated) | None    |
+| DISABLE_USERAGENT | Hide browser and OS when set to a non-empty value other than `false` or `0`; environment variable alias: `DISABLE_AGENT` | Off |
+| AVATAR_PROXY | Proxy service URL used by clients to load avatars; unset, `false`, or `0` uses direct URLs | Unset |
+| LEVELS | Comma-separated, strictly increasing non-negative integer thresholds; unset, empty, `false`, `0`, or invalid values disable levels | Off |
+| DISABLE_REGION | Region information is not displayed and parsing is not implemented; this variable has no effect | No effect |
+
+Display configuration details:
+
+- `DISABLE_USERAGENT` is off when unset, empty, `false`, or `0` (case-insensitive), preserving browser and OS display. Any other value hides them. If both the official variable and `DISABLE_AGENT` are set, an explicit value of the official variable takes precedence. Administrators can still see the raw UA.
+- When `AVATAR_PROXY` is unset, empty, `false`, or `0`, Gravatar and custom avatars are loaded directly. When set to a proxy service URL, clients access that service with the encoded custom avatar URL in its `?url=` parameter. The Worker only generates the proxy URL; it does not forward image data. This applies to comment, user profile, and login-related avatars.
+- `LEVELS` is disabled when unset, empty, `false`, or `0`. Example: `0,10,20,50,100,200`. Thresholds use the count of public, approved comments across pages. Logged-in users are grouped by `user_id`; anonymous comments are grouped by email. Without an email, the level is 0. The response's integer `level` field is displayed using the client's `locale.levelN` text.
+- Region information is currently not displayed and no region parsing is implemented; `DISABLE_REGION` does not change this behavior.
 
 ## Secrets (via `wrangler secret put`)
 

@@ -10,6 +10,15 @@ compatibility_date = "2026-06-03" # could be current-date
 [vars]
 # Optional: Restrict CORS access to specific domains (comma-separated, no http://)
 # SECURE_DOMAINS = "yourdomain.com,localhost:3000"
+# Hide parsed browser and OS in public comments; DISABLE_AGENT is an environment variable alias.
+# DISABLE_USERAGENT = "true"
+# Client-facing proxy service URL for comment, user, and login avatars.
+# The Worker generates proxy URLs but does not forward image data.
+# AVATAR_PROXY = "https://avatar-proxy.example.com"
+# Optional strictly increasing approved-comment thresholds, e.g. 0,10,20,50,100,200.
+# LEVELS = "0,10,20,50,100,200"
+# Region parsing is not implemented; DISABLE_REGION has no effect.
+# DISABLE_REGION = "true"
 
 # Cloudflare D1 Database Binding
 [[d1_databases]]

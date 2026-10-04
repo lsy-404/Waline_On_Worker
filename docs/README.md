@@ -181,6 +181,17 @@ pnpm exec wrangler d1 execute <database-name> --remote --file=backup.sql
 | `SITE_NAME` | 站点名称 | `Waline` |
 | `SITE_URL` | 站点 URL | - |
 | `SECURE_DOMAINS` | 允许的域名（逗号分隔） | - |
+| `DISABLE_USERAGENT` | 设置为非空且非 `false`/`0` 时隐藏评论中的浏览器和操作系统；支持环境变量别名 `DISABLE_AGENT` | 关闭 |
+| `AVATAR_PROXY` | 配置代理服务 URL 后，客户端通过该服务加载头像；未配置或为 `false`/`0` 时直连 | 未配置 |
+| `LEVELS` | 评论等级阈值，逗号分隔的非负整数严格递增序列；未设置、为空、`false`/`0` 或非法时关闭 | 关闭 |
+| `DISABLE_REGION` | 当前不显示地区信息且没有地区解析；此变量不改变行为 | 无效 |
+
+显示配置说明：
+
+- `DISABLE_USERAGENT` 未设置、为空、`false` 或 `0`（不区分大小写）时保留浏览器和操作系统显示；其他值隐藏它们。同时设置官方变量和 `DISABLE_AGENT` 时，以官方变量的显式值为准。管理员仍可查看原始 UA。
+- `AVATAR_PROXY` 未设置、为空、`false` 或 `0` 时，Gravatar 和自定义头像均直接访问原地址；配置代理服务 URL 后，客户端会访问该服务，并在 `?url=` 参数中传递编码后的自定义头像 URL。Worker 只生成代理 URL，不转发图片。此设置适用于评论、用户资料和登录相关头像。
+- `LEVELS` 未设置、为空、`false` 或 `0` 时关闭。示例：`0,10,20,50,100,200`。阈值按公开且已通过审核的评论数计算，并跨页面累计；登录用户按 `user_id` 归属，匿名评论按邮箱归属，没有邮箱时等级为 0。响应中的整数 `level` 字段由客户端的 `locale.levelN` 文案显示。
+- 当前不显示地区信息，也没有地区解析实现；`DISABLE_REGION` 不改变此行为。
 
 ### Secrets (通过 `wrangler secret put` 设置)
 
