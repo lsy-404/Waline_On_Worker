@@ -215,6 +215,22 @@ pnpm exec wrangler d1 execute <database-name> --remote --file=./schema.sql
 pnpm run deploy
 ```
 
+## Feature support and platform boundaries
+
+The variables requested in this issue—`DISABLE_REGION`, `DISABLE_USERAGENT` (and its `DISABLE_AGENT` alias), `AVATAR_PROXY`, and `LEVELS`—are implemented and wired into the Worker. They are not unsupported platform features.
+
+The following upstream variables and integrations are not implemented, so setting them does not enable the corresponding feature (the `LOGIN` variable does not control the login feature): `LOGIN`, `SERVER_URL`, `GRAVATAR_STR`, `COMMENT_AUDIT`, `MARKDOWN_*`, `SMTP_*`, `SENDER_*`, `DISABLE_AUTHOR_NOTIFY`, `WEBHOOK`, server-side verification with `TURNSTILE_SECRET` / `RECAPTCHA_V3_SECRET`, and `IPQPS` environment-variable rate limiting. The project has its own `AUDIT` setting; it is different from the upstream `COMMENT_AUDIT` variable. The frontend Captcha key is currently injected only into the admin page and does not provide complete bot verification. These integrations can be implemented later; this does not mean Workers cannot support them.
+
+This backend uses D1. Upstream storage-driver variables such as `MONGO`, `MYSQL`, `PG`, `LEAN`, `GITHUB`, and `TCB` do not switch this project to those databases. This is the current backend choice, not a claim that Workers cannot connect to other databases.
+
+Actual limits and guarantees:
+
+- Region data comes only from Cloudflare `request.cf` on new comment requests. It cannot backfill older comments without stored region data. If Cloudflare provides no location data, a reliable country, region, or city cannot be shown; exact coordinates are not guaranteed. [Cloudflare `request.cf` documentation](https://developers.cloudflare.com/workers/runtime-apis/request/#incomingrequestcfproperties)
+- Anonymous levels are grouped by email. An email address is not an authenticated identity, so a level cannot be guaranteed to represent a real or unique person.
+- Avatar proxying generates a third-party service URL with `?url=` for clients to fetch. This project does not relay the image and cannot guarantee the external service's availability.
+- The Workers `/tmp` filesystem does not persist across requests, so a traditional `SQLITE_PATH` or host filesystem path cannot be used unchanged as a persistent database file. [Node.js file-system documentation](https://developers.cloudflare.com/workers/runtime-apis/nodejs/fs/)
+- Workers disable TCP port 25 by default. This does not make all SMTP or email sending unavailable; use a mail service and connection method supported by the deployment. [TCP sockets documentation](https://developers.cloudflare.com/workers/runtime-apis/tcp-sockets/)
+
 ## Secrets (via `wrangler secret put`)
 
 | Secret     | Description        | Required |
