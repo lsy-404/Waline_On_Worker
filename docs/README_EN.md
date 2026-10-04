@@ -194,6 +194,42 @@ Recommended solutions:
 | SITE_NAME      | Site name                         | Waline  |
 | SITE_URL       | Site URL                          | None    |
 | SECURE_DOMAINS | Allowed domains (comma-separated) | None    |
+| DISABLE_USERAGENT | Hide browser and OS when set to a non-empty value other than `false` or `0`; environment variable alias: `DISABLE_AGENT` | Off |
+| AVATAR_PROXY | Proxy service URL used by clients to load avatars; unset, `false`, or `0` uses direct URLs | Unset |
+| LEVELS | Comma-separated, strictly increasing non-negative integer thresholds; unset, empty, `false`, `0`, or invalid values disable levels | Off |
+| DISABLE_REGION | Hide public region data when set to `true` or another non-empty value other than `false` or `0`; admins can still see it | Off |
+
+Display configuration details:
+
+- `DISABLE_USERAGENT` is off when unset, empty, `false`, or `0` (case-insensitive), preserving browser and OS display. Any other value hides them. If both the official variable and `DISABLE_AGENT` are set, an explicit value of the official variable takes precedence. Administrators can still see the raw UA.
+- When `AVATAR_PROXY` is unset, empty, `false`, or `0`, Gravatar and custom avatars are loaded directly. When set to a proxy service URL, clients access that service with the encoded custom avatar URL in its `?url=` parameter. The Worker only generates the proxy URL; it does not forward image data. This applies to comment, user profile, and login-related avatars.
+- `LEVELS` is disabled when unset, empty, `false`, or `0`. Example: `0,10,20,50,100,200`. Thresholds use the count of public, approved comments across pages. Logged-in users are grouped by `user_id`; anonymous comments are grouped by email. Without an email, the level is 0. The response's integer `level` field is displayed using the client's `locale.levelN` text.
+- When a new comment is submitted, the Worker uses only Cloudflare's [`request.cf` country, region, and city data](https://developers.cloudflare.com/workers/runtime-apis/request/#incomingrequestcfproperties). It does not trust request bodies or geolocation headers and does not use the reader's location. Public comment `addr` contains the country code and region; administrators can also receive the city with `type=list`. If Cloudflare provides no data (for example, on local or preview requests), or an older comment has no region record, no region `addr` is returned. Older comments are not backfilled. When `DISABLE_REGION` is unset, empty, `false`, or `0`, public region display remains enabled. Set it to `true` or any other non-empty value to hide public `addr`; administrators can still see region data.
+
+Region data is stored in `wl_CommentRegion` and is deleted with its comment through a foreign-key cascade. Admin-panel Comment JSON export/import includes the optional `cfRegion: { country, region, city }` field for region backup.
+
+For an existing deployment, idempotently reapply `schema.sql` to create the region table before deploying the Worker. Run these commands in order:
+
+```bash
+pnpm exec wrangler d1 execute <database-name> --remote --file=./schema.sql
+pnpm run deploy
+```
+
+## Feature support and platform boundaries
+
+The display variables `DISABLE_REGION`, `DISABLE_USERAGENT` (and its `DISABLE_AGENT` alias), `AVATAR_PROXY`, and `LEVELS` are wired into the Worker.
+
+The following upstream variables and integrations are not implemented, so setting them does not enable the corresponding feature (the `LOGIN` variable does not control the login feature): `LOGIN`, `SERVER_URL`, `GRAVATAR_STR`, `COMMENT_AUDIT`, `MARKDOWN_*`, `SMTP_*`, `SENDER_*`, `DISABLE_AUTHOR_NOTIFY`, `WEBHOOK`, server-side verification with `TURNSTILE_SECRET` / `RECAPTCHA_V3_SECRET`, and `IPQPS` environment-variable rate limiting. The project has its own `AUDIT` setting; it is different from the upstream `COMMENT_AUDIT` variable. The frontend Captcha key is currently injected only into the admin page and does not provide complete bot verification. These integrations can be implemented later; this does not mean Workers cannot support them.
+
+This backend uses D1. Upstream storage-driver variables such as `MONGO_*`, `MYSQL_*`, `PG_*` / `POSTGRES_*`, `LEAN_*`, `GITHUB_*`, and `TCB_*` do not switch this project to those databases. This is the current backend choice, not a claim that Workers cannot connect to other databases.
+
+Actual limits and guarantees:
+
+- Region data comes only from Cloudflare `request.cf` on new comment requests. It cannot backfill older comments without stored region data. If Cloudflare provides no location data, a reliable country, region, or city cannot be shown; this implementation does not expose exact coordinates. [Cloudflare `request.cf` documentation](https://developers.cloudflare.com/workers/runtime-apis/request/#incomingrequestcfproperties)
+- Anonymous levels are grouped by email. An email address is not an authenticated identity, so a level cannot be guaranteed to represent a real or unique person.
+- Avatar proxying generates a third-party service URL with `?url=` for clients to fetch. This project does not relay the image and cannot guarantee the external service's availability.
+- The Workers `/tmp` filesystem does not persist across requests, so a traditional `SQLITE_PATH` or host filesystem path cannot be used unchanged as a persistent database file. [Node.js file-system documentation](https://developers.cloudflare.com/workers/runtime-apis/nodejs/fs/)
+- Workers disable TCP port 25 by default. This does not make all SMTP or email sending unavailable; use a mail service and connection method supported by the deployment. [TCP sockets documentation](https://developers.cloudflare.com/workers/runtime-apis/tcp-sockets/)
 
 ## Secrets (via `wrangler secret put`)
 

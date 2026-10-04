@@ -14,7 +14,7 @@ export default defineConfig({
   },
   plugins: [
     cloudflareTest({
-      wrangler: { configPath: './wrangler.toml' },
+      wrangler: { configPath: './test/wrangler.toml' },
       miniflare: {
         bindings: { JWT_SECRET: 'test-secret' },
       },

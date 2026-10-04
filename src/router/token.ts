@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { Env, Variables } from "../env.js";
 import { signJwt } from "../middleware/auth.js";
-import { getAvatar } from "../utils/avatar.js";
+import { getAvatar, proxyAvatar } from "../utils/avatar.js";
 import { md5 } from "../utils/hash.js";
 import { verifyPassword } from "../utils/password.js";
 import { generateSecret, verifyTotp } from "../utils/totp.js";
@@ -29,7 +29,10 @@ tokenRoutes.get("/", async (c) => {
 			email: userInfo.email,
 			type: userInfo.type,
 			url: userInfo.url,
-			avatar: userInfo.avatar || (await getAvatar(userInfo.email)),
+			avatar: proxyAvatar(
+				userInfo.avatar || (await getAvatar(userInfo.email)),
+				c.env.AVATAR_PROXY,
+			),
 			label: userInfo.label || "",
 			github: userInfo.github,
 			twitter: userInfo.twitter,
@@ -105,8 +108,10 @@ tokenRoutes.post("/", async (c) => {
 			email: user.email,
 			type: user.type,
 			url: user.url || "",
-			avatar:
+			avatar: proxyAvatar(
 				(user.avatar as string) || (await getAvatar(user.email as string)),
+				c.env.AVATAR_PROXY,
+			),
 			label: user.label || "",
 			mailMd5: await md5((user.email as string).toLowerCase()),
 		},

@@ -181,6 +181,39 @@ pnpm exec wrangler d1 execute <database-name> --remote --file=backup.sql
 | `SITE_NAME` | 站点名称 | `Waline` |
 | `SITE_URL` | 站点 URL | - |
 | `SECURE_DOMAINS` | 允许的域名（逗号分隔） | - |
+| `DISABLE_USERAGENT` | 设置为非空且非 `false`/`0` 时隐藏评论中的浏览器和操作系统；支持环境变量别名 `DISABLE_AGENT` | 关闭 |
+| `AVATAR_PROXY` | 配置代理服务 URL 后，客户端通过该服务加载头像；未配置或为 `false`/`0` 时直连 | 未配置 |
+| `LEVELS` | 评论等级阈值，逗号分隔的非负整数严格递增序列；未设置、为空、`false`/`0` 或非法时关闭 | 关闭 |
+| `DISABLE_REGION` | 设置为 `true` 或其他非空且非 `false`/`0` 的值时隐藏公开地区；管理员仍可见 | 关闭 |
+
+显示配置说明：
+
+- `DISABLE_USERAGENT` 未设置、为空、`false` 或 `0`（不区分大小写）时保留浏览器和操作系统显示；其他值隐藏它们。同时设置官方变量和 `DISABLE_AGENT` 时，以官方变量的显式值为准。管理员仍可查看原始 UA。
+- `AVATAR_PROXY` 未设置、为空、`false` 或 `0` 时，Gravatar 和自定义头像均直接访问原地址；配置代理服务 URL 后，客户端会访问该服务，并在 `?url=` 参数中传递编码后的自定义头像 URL。Worker 只生成代理 URL，不转发图片。此设置适用于评论、用户资料和登录相关头像。
+- `LEVELS` 未设置、为空、`false` 或 `0` 时关闭。示例：`0,10,20,50,100,200`。阈值按公开且已通过审核的评论数计算，并跨页面累计；登录用户按 `user_id` 归属，匿名评论按邮箱归属，没有邮箱时等级为 0。响应中的整数 `level` 字段由客户端的 `locale.levelN` 文案显示。
+- 新评论提交时，Worker 只使用 Cloudflare 的 [`request.cf` 国家、地区和城市信息](https://developers.cloudflare.com/workers/runtime-apis/request/#incomingrequestcfproperties)；不采信请求正文或地理位置请求头，也不使用阅读者的位置。公开评论的 `addr` 显示国家代码和省区，管理员通过 `type=list` 可额外取得城市。Cloudflare 未提供数据（例如本地/预览请求）或旧评论没有地区记录时，不返回地区 `addr`；旧评论不会补查。`DISABLE_REGION` 未设置、为空、`false` 或 `0` 时保留公开地区显示；设为 `true` 或其他非空值时隐藏公开 `addr`，管理员仍可见地区。
+- 地区数据保存在 `wl_CommentRegion` 表中，随评论删除通过外键级联删除。管理面板 Comment JSON 导出/导入会携带可选的 `cfRegion: { country, region, city }`，可用于地区数据备份。
+- 已有部署升级时，先幂等重放 `schema.sql` 创建地区表，再部署 Worker，按以下顺序执行：
+  ```bash
+  pnpm exec wrangler d1 execute <database-name> --remote --file=./schema.sql
+  pnpm run deploy
+  ```
+
+### 功能支持范围与平台边界
+
+评论显示变量 `DISABLE_REGION`、`DISABLE_USERAGENT`（及别名 `DISABLE_AGENT`）、`AVATAR_PROXY` 和 `LEVELS` 均已接入。
+
+以下上游变量和能力目前尚未实现或接入，设置它们不会启用对应功能（`LOGIN` 是变量名，不代表项目没有现有登录功能）：`LOGIN`、`SERVER_URL`、`GRAVATAR_STR`、`COMMENT_AUDIT`、`MARKDOWN_*`、`SMTP_*`、`SENDER_*`、`DISABLE_AUTHOR_NOTIFY`、`WEBHOOK`、服务端 `TURNSTILE_SECRET` / `RECAPTCHA_V3_SECRET` 验证，以及 `IPQPS` 环境变量限流。项目已有自定义 `AUDIT`，不能用上游 `COMMENT_AUDIT` 变量替代。Captcha 前端 key 目前只注入管理面板，尚未形成完整的机器人验证。这些集成都可以后续实现，并非 Workers 做不到。
+
+此后端固定使用 D1；上游 Waline 的 `MONGO_*`、`MYSQL_*`、`PG_*` / `POSTGRES_*`、`LEAN_*`、`GITHUB_*`、`TCB_*` 等存储驱动变量不会切换本项目的数据存储。这是当前后端选择，不代表 Workers 无法连接其他数据库。
+
+实际限制和保证范围：
+
+- 地区只取新评论请求的 Cloudflare `request.cf` 信息，不能为没有记录的旧评论回溯补值；Cloudflare 未提供位置数据的请求无法显示可靠的国家、省区或城市，本实现也不提供精确坐标。[`request.cf` 文档](https://developers.cloudflare.com/workers/runtime-apis/request/#incomingrequestcfproperties)
+- 匿名等级按邮箱关联，邮箱不是经过认证的身份，因此等级不保证对应真实或唯一的自然人。
+- 头像代理只按 `?url=` 生成供客户端使用的第三方代理服务 URL；本项目不转发图片，也不能保证外部服务持续可用。
+- Workers 的 `/tmp` 文件系统不跨请求持久化，不能把传统 `SQLITE_PATH` 或宿主文件路径直接当作持久数据库文件。[Node.js 文件系统文档](https://developers.cloudflare.com/workers/runtime-apis/nodejs/fs/)
+- Workers 默认禁用 TCP 25 端口；这不代表所有 SMTP 或邮件发送都不可用，需按邮件服务支持的连接方式配置。[TCP sockets 文档](https://developers.cloudflare.com/workers/runtime-apis/tcp-sockets/)
 
 ### Secrets (通过 `wrangler secret put` 设置)
 
