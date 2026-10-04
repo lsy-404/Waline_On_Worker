@@ -39,7 +39,7 @@ chmod +x deploy.sh
 pnpm install
 
 # 2. Create a D1 database
-npx wrangler d1 create waline-db
+pnpm exec wrangler d1 create waline-db
 
 # 3. Edit wrangler.toml and fill in the database_id
 # returned from the previous step
@@ -48,7 +48,7 @@ npx wrangler d1 create waline-db
 pnpm run db:init
 
 # 5. Set JWT secret
-npx wrangler secret put JWT_SECRET
+pnpm exec wrangler secret put JWT_SECRET
 # Enter a random string as the secret
 
 # 6. Deploy
@@ -167,10 +167,10 @@ For large datasets, direct D1 database operations are recommended:
 
 ```bash
 # Export to SQL
-npx wrangler d1 export <database-name> --remote --output=backup.sql
+pnpm exec wrangler d1 export <database-name> --remote --output=backup.sql
 
 # Import from SQL
-npx wrangler d1 execute <database-name> --remote --file=backup.sql
+pnpm exec wrangler d1 execute <database-name> --remote --file=backup.sql
 ```
 
 ### Warning: Large Data Imports

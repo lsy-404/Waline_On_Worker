@@ -13,26 +13,22 @@ Write-Host "=== Waline on Worker - 部署脚本 ===" -ForegroundColor Cyan
 Write-Host ""
 
 # 检查依赖
-if (-not (Get-Command npx -ErrorAction SilentlyContinue)) {
-    Write-Host "错误: 需要安装 Node.js (npx)" -ForegroundColor Red
+if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) {
+    Write-Host "错误: 请启用 Corepack 并安装 pnpm" -ForegroundColor Red
     exit 1
 }
 
 # 安装依赖
 Write-Host "[1/5] 安装依赖..." -ForegroundColor Yellow
-if (Get-Command pnpm -ErrorAction SilentlyContinue) {
-    pnpm install
-} else {
-    npm install
-}
+pnpm install --frozen-lockfile
 
 # 检查 wrangler 登录状态
 Write-Host ""
 Write-Host "[2/5] 检查 Wrangler 登录状态..." -ForegroundColor Yellow
 try {
-    $null = npx wrangler whoami 2>&1
+    $null = pnpm exec wrangler whoami 2>&1
 } catch {
-    Write-Host "未登录 Wrangler，请先运行: npx wrangler login" -ForegroundColor Red
+    Write-Host "未登录 Wrangler，请先运行: pnpm exec wrangler login" -ForegroundColor Red
     exit 1
 }
 
@@ -42,7 +38,7 @@ Write-Host "[3/5] 检查 D1 数据库..." -ForegroundColor Yellow
 $tomlContent = Get-Content $Config -Raw
 if ($tomlContent -match 'database_id\s*=\s*""') {
     Write-Host "创建 D1 数据库..."
-    $dbOutput = npx wrangler d1 create waline-db --config $Config 2>&1 | Out-String
+    $dbOutput = pnpm exec wrangler d1 create waline-db --config $Config 2>&1 | Out-String
     Write-Host $dbOutput
 
     if ($dbOutput -match 'database_id\s*=\s*"([^"]+)"') {
@@ -58,7 +54,7 @@ if ($tomlContent -match 'database_id\s*=\s*""') {
 # 初始化数据库
 Write-Host ""
 Write-Host "[4/5] 初始化数据库 Schema..." -ForegroundColor Yellow
-npx wrangler d1 execute waline-db --file=./schema.sql --remote --config $Config
+pnpm exec wrangler d1 execute waline-db --file=./schema.sql --remote --config $Config
 
 # 设置 JWT_SECRET
 Write-Host ""
@@ -68,14 +64,14 @@ if ($reply -match '^[Yy]$') {
     $bytes = New-Object byte[] 32
     [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
     $jwtSecret = [Convert]::ToBase64String($bytes).Substring(0, 32)
-    $jwtSecret | npx wrangler secret put JWT_SECRET --config $Config
+    $jwtSecret | pnpm exec wrangler secret put JWT_SECRET --config $Config
     Write-Host "JWT_SECRET 已设置" -ForegroundColor Green
 }
 
 # 部署
 Write-Host ""
 Write-Host "=== 开始部署 ===" -ForegroundColor Cyan
-npx wrangler deploy --config $Config
+pnpm exec wrangler deploy --config $Config
 
 Write-Host ""
 Write-Host "=== 部署完成 ===" -ForegroundColor Green
