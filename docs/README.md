@@ -201,15 +201,15 @@ pnpm exec wrangler d1 execute <database-name> --remote --file=backup.sql
 
 ### 功能支持范围与平台边界
 
-本 issue 涉及的 `DISABLE_REGION`、`DISABLE_USERAGENT`（及别名 `DISABLE_AGENT`）、`AVATAR_PROXY` 和 `LEVELS` 均已实现并接入，不能归类为平台不支持。
+评论显示变量 `DISABLE_REGION`、`DISABLE_USERAGENT`（及别名 `DISABLE_AGENT`）、`AVATAR_PROXY` 和 `LEVELS` 均已接入。
 
-以下上游变量和能力目前尚未实现或接入，设置它们不会启用对应功能（`LOGIN` 是变量名，不代表项目没有现有登录功能）：`LOGIN`、`SERVER_URL`、`GRAVATAR_STR`、`COMMENT_AUDIT`、`MARKDOWN_*`、`SMTP_*`、`SENDER_*`、`DISABLE_AUTHOR_NOTIFY`、`WEBHOOK`、服务端 `TURNSTILE_SECRET` / `RECAPTCHA_V3_SECRET` 验证，以及 `IPQPS` 环境变量限流。项目已有自定义 `AUDIT`，它不等同于上游同名的 `COMMENT_AUDIT`。Captcha 前端 key 目前只注入管理面板，尚未形成完整的机器人验证。这些集成都可以后续实现，并非 Workers 做不到。
+以下上游变量和能力目前尚未实现或接入，设置它们不会启用对应功能（`LOGIN` 是变量名，不代表项目没有现有登录功能）：`LOGIN`、`SERVER_URL`、`GRAVATAR_STR`、`COMMENT_AUDIT`、`MARKDOWN_*`、`SMTP_*`、`SENDER_*`、`DISABLE_AUTHOR_NOTIFY`、`WEBHOOK`、服务端 `TURNSTILE_SECRET` / `RECAPTCHA_V3_SECRET` 验证，以及 `IPQPS` 环境变量限流。项目已有自定义 `AUDIT`，不能用上游 `COMMENT_AUDIT` 变量替代。Captcha 前端 key 目前只注入管理面板，尚未形成完整的机器人验证。这些集成都可以后续实现，并非 Workers 做不到。
 
-此后端固定使用 D1；上游 Waline 的 `MONGO`、`MYSQL`、`PG`、`LEAN`、`GITHUB`、`TCB` 等存储驱动变量不会切换本项目的数据存储。这是当前后端选择，不代表 Workers 无法连接其他数据库。
+此后端固定使用 D1；上游 Waline 的 `MONGO_*`、`MYSQL_*`、`PG_*` / `POSTGRES_*`、`LEAN_*`、`GITHUB_*`、`TCB_*` 等存储驱动变量不会切换本项目的数据存储。这是当前后端选择，不代表 Workers 无法连接其他数据库。
 
 实际限制和保证范围：
 
-- 地区只取新评论请求的 Cloudflare `request.cf` 信息，不能为没有记录的旧评论回溯补值；Cloudflare 未提供位置数据的请求无法显示可靠的国家、省区或城市，也不提供精确坐标保证。[`request.cf` 文档](https://developers.cloudflare.com/workers/runtime-apis/request/#incomingrequestcfproperties)
+- 地区只取新评论请求的 Cloudflare `request.cf` 信息，不能为没有记录的旧评论回溯补值；Cloudflare 未提供位置数据的请求无法显示可靠的国家、省区或城市，本实现也不提供精确坐标。[`request.cf` 文档](https://developers.cloudflare.com/workers/runtime-apis/request/#incomingrequestcfproperties)
 - 匿名等级按邮箱关联，邮箱不是经过认证的身份，因此等级不保证对应真实或唯一的自然人。
 - 头像代理只按 `?url=` 生成供客户端使用的第三方代理服务 URL；本项目不转发图片，也不能保证外部服务持续可用。
 - Workers 的 `/tmp` 文件系统不跨请求持久化，不能把传统 `SQLITE_PATH` 或宿主文件路径直接当作持久数据库文件。[Node.js 文件系统文档](https://developers.cloudflare.com/workers/runtime-apis/nodejs/fs/)

@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS "wl_Comment" (
 
 CREATE INDEX IF NOT EXISTS "idx_comment_url" ON "wl_Comment" ("url");
 CREATE INDEX IF NOT EXISTS "idx_comment_status" ON "wl_Comment" ("status");
+CREATE INDEX IF NOT EXISTS "idx_comment_mail_status" ON "wl_Comment" ("mail", "status");
 CREATE INDEX IF NOT EXISTS "idx_comment_rid" ON "wl_Comment" ("rid");
 CREATE INDEX IF NOT EXISTS "idx_comment_pid" ON "wl_Comment" ("pid");
 CREATE INDEX IF NOT EXISTS "idx_comment_user_id" ON "wl_Comment" ("user_id");

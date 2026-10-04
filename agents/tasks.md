@@ -9,3 +9,4 @@
 | 002 | [Feature]_overture_polish | 使 Overture 包支持无自定义域名部署，补全条款、国际化和推荐入口 | 消除不必要的域名前置条件并完整说明部署影响 | ✅ 已完成 |
 | 009 | [PackageManagement] pnpm CLI migration | Make Worker setup and deployment pnpm-only | Keep supported Node.js workflows consistently on pnpm | ✅ 已完成 |
 | 010 | [Feature]_display_environment_variables | 支持评论显示环境变量与 API 行为验证 | 跟进用户所需的显示与头像、等级配置 | 🔄 进行中（实现与验证完成，PR 待审核） |
+| 011 | [Review]_display_configuration | 对抗审查显示配置与支持边界，修复后评论及合并 | 确认实际能力与交付可靠性 | 🔄 进行中 |
