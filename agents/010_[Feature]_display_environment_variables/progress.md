@@ -20,3 +20,9 @@
 - git fetch origin --prune（交付前）：origin/main 仍为 f162285，无新主干提交需要处理。
 - gh API branch protection/rules：确认 active Main Protect ruleset，后续通过 PR 交付，等待所需审核；没有生产部署。
 - 全局 ignore /test 与本机 exclude /agents 已确认；本次新增验证与审计文件将显式加入版本控制。
+
+- 本地审阅后提交实现 e0209a6（Support comment display environment variables）与文档 3dd7134（Document display environment variables）。
+- 按 packageManager 使用 corepack pnpm 10.34.6 再验证类型与36个新增用例，均通过。
+- 提交前自检：新增代码/测试注释与提交文案未含任务号、模型署名、Co-authored-by 或控制回调地址；普通文档保留必要公开参考链接。
+- git push -u origin codex/display-env：成功；创建 PR https://github.com/lsy-404/Waline_On_Worker/pull/12 并附加到当前聊天。
+- 仓库 allow_auto_merge=false；PR 等待1个所需批准，未绕过保护、未合入 main，issue #9 保持开放以保留地区范围讨论。
