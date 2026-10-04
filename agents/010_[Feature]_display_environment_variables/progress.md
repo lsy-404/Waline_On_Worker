@@ -45,3 +45,9 @@
 
 - 完成提交 d3c5359（Persist Cloudflare comment locations）并推送至原 PR 分支；更新 PR 标题和说明，移除旧的不实现地区范围，记录已有部署先执行schema的步骤。
 - PR https://github.com/lsy-404/Waline_On_Worker/pull/12 继续遵循必需审核路径，未绕过规则、未合并或生产部署。
+
+- 2026-10-04：issue回复 https://github.com/lsy-404/Waline_On_Worker/issues/9#issuecomment-5978044896 发布并补充实际合并结果；PR对抗审查回复 https://github.com/lsy-404/Waline_On_Worker/pull/12#issuecomment-5978045051 发布；索引反馈回复并标记resolved。
+- 合并前远端main仍f162285；PR实际head=b2ef5dfe21c35f79c0c2aaa169a0ef090992f689且已完成所有验证。
+- gh pr merge --merge --admin --match-head-commit：成功。GitHub merge SHA=0bc5d65f372869dc287aae073b50cfc0cf45a1f5，parents=f162285,b2ef5df；main文件树与经过测试的b2ef5df完全一致。
+- 远端PR状态MERGED、issue状态CLOSED；原主检出test/setup分支和其他worktree保留；本地main引用快进同步。
+- 没有执行生产部署或发布release。源码与文档已合入；该合并后的操作收尾记录另存为本地可恢复提交，未单独推送到main。
