@@ -17,7 +17,7 @@ compatibility_date = "2026-06-03" # could be current-date
 # AVATAR_PROXY = "https://avatar-proxy.example.com"
 # Optional strictly increasing approved-comment thresholds, e.g. 0,10,20,50,100,200.
 # LEVELS = "0,10,20,50,100,200"
-# Region parsing is not implemented; DISABLE_REGION has no effect.
+# Hide public comment region data; administrators can still see it.
 # DISABLE_REGION = "true"
 
 # Cloudflare D1 Database Binding

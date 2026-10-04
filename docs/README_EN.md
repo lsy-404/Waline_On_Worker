@@ -197,14 +197,23 @@ Recommended solutions:
 | DISABLE_USERAGENT | Hide browser and OS when set to a non-empty value other than `false` or `0`; environment variable alias: `DISABLE_AGENT` | Off |
 | AVATAR_PROXY | Proxy service URL used by clients to load avatars; unset, `false`, or `0` uses direct URLs | Unset |
 | LEVELS | Comma-separated, strictly increasing non-negative integer thresholds; unset, empty, `false`, `0`, or invalid values disable levels | Off |
-| DISABLE_REGION | Region information is not displayed and parsing is not implemented; this variable has no effect | No effect |
+| DISABLE_REGION | Hide public region data when set to `true` or another non-empty value other than `false` or `0`; admins can still see it | Off |
 
 Display configuration details:
 
 - `DISABLE_USERAGENT` is off when unset, empty, `false`, or `0` (case-insensitive), preserving browser and OS display. Any other value hides them. If both the official variable and `DISABLE_AGENT` are set, an explicit value of the official variable takes precedence. Administrators can still see the raw UA.
 - When `AVATAR_PROXY` is unset, empty, `false`, or `0`, Gravatar and custom avatars are loaded directly. When set to a proxy service URL, clients access that service with the encoded custom avatar URL in its `?url=` parameter. The Worker only generates the proxy URL; it does not forward image data. This applies to comment, user profile, and login-related avatars.
 - `LEVELS` is disabled when unset, empty, `false`, or `0`. Example: `0,10,20,50,100,200`. Thresholds use the count of public, approved comments across pages. Logged-in users are grouped by `user_id`; anonymous comments are grouped by email. Without an email, the level is 0. The response's integer `level` field is displayed using the client's `locale.levelN` text.
-- Region information is currently not displayed and no region parsing is implemented; `DISABLE_REGION` does not change this behavior.
+- When a new comment is submitted, the Worker uses only Cloudflare's [`request.cf` country, region, and city data](https://developers.cloudflare.com/workers/runtime-apis/request/#incomingrequestcfproperties). It does not trust request bodies or geolocation headers and does not use the reader's location. Public comment `addr` contains the country code and region; administrators can also receive the city with `type=list`. If Cloudflare provides no data (for example, on local or preview requests), or an older comment has no region record, no region `addr` is returned. Older comments are not backfilled. When `DISABLE_REGION` is unset, empty, `false`, or `0`, public region display remains enabled. Set it to `true` or any other non-empty value to hide public `addr`; administrators can still see region data.
+
+Region data is stored in `wl_CommentRegion` and is deleted with its comment through a foreign-key cascade. Admin-panel Comment JSON export/import includes the optional `cfRegion: { country, region, city }` field for region backup.
+
+For an existing deployment, idempotently reapply `schema.sql` to create the region table before deploying the Worker. Run these commands in order:
+
+```bash
+pnpm exec wrangler d1 execute <database-name> --remote --file=./schema.sql
+pnpm run deploy
+```
 
 ## Secrets (via `wrangler secret put`)
 

@@ -184,14 +184,20 @@ pnpm exec wrangler d1 execute <database-name> --remote --file=backup.sql
 | `DISABLE_USERAGENT` | 设置为非空且非 `false`/`0` 时隐藏评论中的浏览器和操作系统；支持环境变量别名 `DISABLE_AGENT` | 关闭 |
 | `AVATAR_PROXY` | 配置代理服务 URL 后，客户端通过该服务加载头像；未配置或为 `false`/`0` 时直连 | 未配置 |
 | `LEVELS` | 评论等级阈值，逗号分隔的非负整数严格递增序列；未设置、为空、`false`/`0` 或非法时关闭 | 关闭 |
-| `DISABLE_REGION` | 当前不显示地区信息且没有地区解析；此变量不改变行为 | 无效 |
+| `DISABLE_REGION` | 设置为 `true` 或其他非空且非 `false`/`0` 的值时隐藏公开地区；管理员仍可见 | 关闭 |
 
 显示配置说明：
 
 - `DISABLE_USERAGENT` 未设置、为空、`false` 或 `0`（不区分大小写）时保留浏览器和操作系统显示；其他值隐藏它们。同时设置官方变量和 `DISABLE_AGENT` 时，以官方变量的显式值为准。管理员仍可查看原始 UA。
 - `AVATAR_PROXY` 未设置、为空、`false` 或 `0` 时，Gravatar 和自定义头像均直接访问原地址；配置代理服务 URL 后，客户端会访问该服务，并在 `?url=` 参数中传递编码后的自定义头像 URL。Worker 只生成代理 URL，不转发图片。此设置适用于评论、用户资料和登录相关头像。
 - `LEVELS` 未设置、为空、`false` 或 `0` 时关闭。示例：`0,10,20,50,100,200`。阈值按公开且已通过审核的评论数计算，并跨页面累计；登录用户按 `user_id` 归属，匿名评论按邮箱归属，没有邮箱时等级为 0。响应中的整数 `level` 字段由客户端的 `locale.levelN` 文案显示。
-- 当前不显示地区信息，也没有地区解析实现；`DISABLE_REGION` 不改变此行为。
+- 新评论提交时，Worker 只使用 Cloudflare 的 [`request.cf` 国家、地区和城市信息](https://developers.cloudflare.com/workers/runtime-apis/request/#incomingrequestcfproperties)；不采信请求正文或地理位置请求头，也不使用阅读者的位置。公开评论的 `addr` 显示国家代码和省区，管理员通过 `type=list` 可额外取得城市。Cloudflare 未提供数据（例如本地/预览请求）或旧评论没有地区记录时，不返回地区 `addr`；旧评论不会补查。`DISABLE_REGION` 未设置、为空、`false` 或 `0` 时保留公开地区显示；设为 `true` 或其他非空值时隐藏公开 `addr`，管理员仍可见地区。
+- 地区数据保存在 `wl_CommentRegion` 表中，随评论删除通过外键级联删除。管理面板 Comment JSON 导出/导入会携带可选的 `cfRegion: { country, region, city }`，可用于地区数据备份。
+- 已有部署升级时，先幂等重放 `schema.sql` 创建地区表，再部署 Worker，按以下顺序执行：
+  ```bash
+  pnpm exec wrangler d1 execute <database-name> --remote --file=./schema.sql
+  pnpm run deploy
+  ```
 
 ### Secrets (通过 `wrangler secret put` 设置)
 
