@@ -42,3 +42,6 @@
 - corepack pnpm exec biome check --write：修改文件无错误；保留既有 RSS 非空断言警告。
 - 审阅文档子 agent 提交 8ee7377 后，本地整合为 4cbc5a5，替换旧地区无效说明并加入升级顺序。
 - 交付前再次 fetch：origin/main 仍 f162285；主干 active PR规则未变化，仍需1个批准。原检出和其他工作区保持不变。
+
+- 完成提交 d3c5359（Persist Cloudflare comment locations）并推送至原 PR 分支；更新 PR 标题和说明，移除旧的不实现地区范围，记录已有部署先执行schema的步骤。
+- PR https://github.com/lsy-404/Waline_On_Worker/pull/12 继续遵循必需审核路径，未绕过规则、未合并或生产部署。

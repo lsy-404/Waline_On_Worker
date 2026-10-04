@@ -1,5 +1,5 @@
 # Waline_On_Worker 项目索引
-> 最后更新：2026-10-03
+> 最后更新：2026-10-04
 
 ## 项目目标
 将兼容 Waline API 的评论服务运行在 Cloudflare Workers 与 D1 上，并提供可审查的 Overture 安装包。
