@@ -28,9 +28,10 @@ try {
   const statements = schema.replace(/--[^\n]*/g, '').split(';').map(value => value.trim()).filter(Boolean);
   const applySchema = () => database.batch(statements.map(statement => database.prepare(statement)));
   await applySchema();
-  const request = (path, body, token) => runtime.dispatchFetch(`https://runtime.example${path}`, {
+  const request = (path, body, token, cf) => runtime.dispatchFetch(`https://runtime.example${path}`, {
     method: body ? 'POST' : 'GET',
     headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    ...(cf ? { cf } : {}),
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
   assert.equal((await request('/')).status, 200);
@@ -44,14 +45,20 @@ try {
   const { data: { token } } = await login.json();
   assert.ok(token);
   assert.equal((await request('/api/token', undefined, token)).status, 200);
-  const comment = await request('/api/comment', { comment: 'Packaged runtime comment', url: '/smoke' }, token);
+  const location = { country: 'CA', region: 'Ontario', city: 'Toronto' };
+  const comment = await request('/api/comment', { comment: 'Packaged runtime comment', url: '/smoke' }, token, location);
   assert.ok(comment.ok, `comment returned ${comment.status}`);
-  assert.equal((await comment.json()).errno, 0);
+  const created = await comment.json();
+  assert.equal(created.errno, 0);
+  assert.equal(created.data.addr, 'CA Ontario');
+  const list = await request('/api/comment?path=/smoke', undefined, undefined, { country: 'US', region: 'Texas', city: 'Austin' });
+  assert.equal((await list.json()).data.data[0].addr, 'CA Ontario');
   await applySchema();
   assert.equal((await database.prepare('SELECT COUNT(*) AS count FROM wl_Users').first()).count, 1);
   assert.equal((await database.prepare('SELECT COUNT(*) AS count FROM wl_Comment').first()).count, 1);
+  assert.equal((await database.prepare('SELECT country, region, city FROM wl_CommentRegion').first()).city, 'Toronto');
   assert.equal((await request('/api/token', undefined, token)).status, 200);
-  console.log('PASS packaged Worker: home, unauthorized access, administrator registration, login, session, comment, schema replay');
+  console.log('PASS packaged Worker: home, unauthorized access, administrator registration, login, session, comment region persistence, schema replay');
 } finally {
   await runtime?.dispose();
   await rm(temporary, { recursive: true, force: true });

@@ -5,6 +5,13 @@ import { getAvatar, proxyAvatar } from "../utils/avatar.js";
 import { getLevel, isEnabled, parseLevels } from "../utils/display.js";
 import { reviewComment } from "../utils/llm-review.js";
 import { renderMarkdown } from "../utils/markdown.js";
+import {
+	type CommentRegion,
+	formatRegion,
+	getCommentRegions,
+	insertRegion,
+	parseRegion,
+} from "../utils/region.js";
 import { parseUA } from "../utils/ua.js";
 import { getSettings } from "./settings.js";
 
@@ -115,33 +122,37 @@ commentRoutes.post("/", async (c) => {
 	// Render markdown to HTML
 	const renderedComment = renderMarkdown(comment);
 
-	const result = await c.env.DB.prepare(
+	const statement = c.env.DB.prepare(
 		`INSERT INTO wl_Comment (user_id, comment, orig, ip, link, mail, nick, pid, rid, sticky, status, "like", ua, url)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 0, ?, ?)`,
-	)
-		.bind(
-			userInfo?.objectId ?? null,
-			renderedComment,
-			comment,
-			ip,
-			link || "",
-			userInfo?.email || mail || "",
-			userInfo?.display_name || nick || "",
-			pid || null,
-			rid || null,
-			status,
-			ua || "",
-			url,
-		)
-		.run();
+	).bind(
+		userInfo?.objectId ?? null,
+		renderedComment,
+		comment,
+		ip,
+		link || "",
+		userInfo?.email || mail || "",
+		userInfo?.display_name || nick || "",
+		pid || null,
+		rid || null,
+		status,
+		ua || "",
+		url,
+	);
+	const location = parseRegion(c.req.raw.cf);
+	const statements = [statement];
+	if (location) statements.push(insertRegion(c.env.DB, location));
+	const [result] = await c.env.DB.batch(statements);
 
 	if (!result.success) {
 		return c.json({ errno: 1, errmsg: "Failed to create comment" }, 500);
 	}
 
 	const newComment = await c.env.DB.prepare(
-		"SELECT * FROM wl_Comment WHERE id = last_insert_rowid()",
-	).first();
+		"SELECT * FROM wl_Comment WHERE id = ?",
+	)
+		.bind(result.meta.last_row_id)
+		.first();
 
 	// Async spam review (Akismet / LLM / Mix)
 	if (newComment) {
@@ -798,9 +809,16 @@ async function formatComments(rows: any[], env: Env, isAdmin = false) {
 		}
 	}
 
+	const regionMap =
+		isAdmin || !isEnabled(env.DISABLE_REGION)
+			? await getCommentRegions(
+					env.DB,
+					comments.map((row) => row.id),
+				)
+			: new Map<number, CommentRegion>();
 	return Promise.all(
 		rows.map(async (row) => {
-			const result = await formatComment(row, env, isAdmin, userMap);
+			const result = await formatComment(row, env, isAdmin, userMap, regionMap);
 			if (result && levels) {
 				const count = row.user_id
 					? userCounts.get(row.user_id)
@@ -816,10 +834,11 @@ async function formatComment(
 	row: any,
 	env: Env,
 	isAdmin = false,
-	userMap?: Map<number, any>,
+	userMap: Map<number, any>,
+	regionMap: Map<number, CommentRegion>,
 ) {
 	if (!row) return null;
-	const user = row.user_id ? userMap?.get(row.user_id) : null;
+	const user = row.user_id ? userMap.get(row.user_id) : null;
 
 	const nick = user?.display_name || row.nick || "Anonymous";
 	const mail = user?.email || row.mail || "";
@@ -871,6 +890,12 @@ async function formatComment(
 
 	if (!isEnabled(env.DISABLE_USERAGENT ?? env.DISABLE_AGENT)) {
 		Object.assign(result, parseUA(row.ua || ""));
+	}
+
+	const location = regionMap.get(row.id);
+	if (location) {
+		const addr = formatRegion(location, isAdmin);
+		if (addr) result.addr = addr;
 	}
 
 	if (isAdmin) {

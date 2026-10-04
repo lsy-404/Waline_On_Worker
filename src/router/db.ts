@@ -7,6 +7,11 @@
  */
 import { Hono } from "hono";
 import type { Env, Variables } from "../env.js";
+import {
+	getCommentRegions,
+	insertRegion,
+	parseRegion,
+} from "../utils/region.js";
 
 export const dbRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -104,11 +109,29 @@ dbRoutes.get("/", async (c) => {
 		const { results } = await c.env.DB.prepare(
 			`SELECT * FROM "${tableName}"`,
 		).all();
-		// Map D1 id → objectId for Waline admin compatibility
-		exportData.data[logicalName] = (results || []).map((row: any) => ({
-			...row,
-			objectId: String(row.id),
-		}));
+		const regions =
+			logicalName === "Comment"
+				? await getCommentRegions(
+						c.env.DB,
+						results.map((row) => row.id as number),
+					)
+				: undefined;
+		exportData.data[logicalName] = results.map((row) => {
+			const cfRegion = regions?.get(row.id as number);
+			return {
+				...row,
+				objectId: String(row.id),
+				...(cfRegion
+					? {
+							cfRegion: {
+								country: cfRegion.country,
+								region: cfRegion.region,
+								city: cfRegion.city,
+							},
+						}
+					: {}),
+			};
+		});
 	}
 
 	return c.json({ errno: 0, data: exportData });
@@ -144,24 +167,28 @@ dbRoutes.post("/", async (c) => {
 	const placeholders = keys.map(() => "?").join(", ");
 	const values = keys.map((k) => body[k]);
 
-	const result = await c.env.DB.prepare(
+	const statement = c.env.DB.prepare(
 		`INSERT INTO "${tableName}" (${cols}) VALUES (${placeholders})`,
-	)
-		.bind(...values)
-		.run();
+	).bind(...values);
+	const statements = [statement];
+	if (
+		table === "Comment" &&
+		body.cfRegion !== undefined &&
+		body.cfRegion !== null
+	) {
+		const location = parseRegion(body.cfRegion);
+		if (!location) return c.json({ errno: 1, errmsg: "Invalid cfRegion" }, 400);
+		statements.push(insertRegion(c.env.DB, location));
+	}
+	const [result] = await c.env.DB.batch(statements);
 
 	if (!result.success) {
 		return c.json({ errno: 1, errmsg: "Insert failed" }, 500);
 	}
 
-	// Get the inserted row's ID
-	const row = await c.env.DB.prepare(
-		`SELECT id FROM "${tableName}" WHERE rowid = last_insert_rowid()`,
-	).first();
-
 	return c.json({
 		errno: 0,
-		data: { objectId: row ? String((row as any).id) : null },
+		data: { objectId: String(result.meta.last_row_id) },
 	});
 });
 
@@ -187,18 +214,41 @@ dbRoutes.put("/", async (c) => {
 	const keys = Object.keys(body).filter(
 		(k) => allowedCols.has(k) && body[k] !== null && body[k] !== undefined,
 	);
-	if (keys.length === 0) {
-		return c.json({ errno: 0 });
+	const statements: D1PreparedStatement[] = [];
+	if (keys.length > 0) {
+		const setClauses = keys.map((k) => `"${k}" = ?`).join(", ");
+		const values = keys.map((k) => body[k]);
+		statements.push(
+			c.env.DB.prepare(
+				`UPDATE "${tableName}" SET ${setClauses}, "updatedAt" = datetime('now') WHERE id = ?`,
+			).bind(...values, Number(objectId)),
+		);
 	}
-
-	const setClauses = keys.map((k) => `"${k}" = ?`).join(", ");
-	const values = keys.map((k) => body[k]);
-
-	await c.env.DB.prepare(
-		`UPDATE "${tableName}" SET ${setClauses}, "updatedAt" = datetime('now') WHERE id = ?`,
-	)
-		.bind(...values, Number(objectId))
-		.run();
+	if (table === "Comment" && Object.hasOwn(body, "cfRegion")) {
+		if (body.cfRegion === null) {
+			statements.push(
+				c.env.DB.prepare(
+					"DELETE FROM wl_CommentRegion WHERE comment_id = ?",
+				).bind(Number(objectId)),
+			);
+		} else {
+			const location = parseRegion(body.cfRegion);
+			if (!location)
+				return c.json({ errno: 1, errmsg: "Invalid cfRegion" }, 400);
+			statements.push(
+				c.env.DB.prepare(
+					`INSERT INTO wl_CommentRegion (comment_id, country, region, city) VALUES (?, ?, ?, ?)
+				ON CONFLICT(comment_id) DO UPDATE SET country = excluded.country, region = excluded.region, city = excluded.city`,
+				).bind(
+					Number(objectId),
+					location.country,
+					location.region,
+					location.city,
+				),
+			);
+		}
+	}
+	if (statements.length) await c.env.DB.batch(statements);
 
 	return c.json({ errno: 0 });
 });

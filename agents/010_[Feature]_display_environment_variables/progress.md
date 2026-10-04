@@ -26,3 +26,19 @@
 - 提交前自检：新增代码/测试注释与提交文案未含任务号、模型署名、Co-authored-by 或控制回调地址；普通文档保留必要公开参考链接。
 - git push -u origin codex/display-env：成功；创建 PR https://github.com/lsy-404/Waline_On_Worker/pull/12 并附加到当前聊天。
 - 仓库 allow_auto_merge=false；PR 等待1个所需批准，未绕过保护、未合入 main，issue #9 保持开放以保留地区范围讨论。
+
+- 2026-10-04：重新 fetch，origin/main 仍为 f162285；原 PR 仍开放且待审核，现有检出干净。继续 codex/display-env。
+- 核对官方 cf Geographic Information 字段与本地 Workers 类型；沿用已读取的 agent-mode、cloudflare、workers-best-practices、wrangler 技能。
+- 为独立文档工作流将干净的专用 docs worktree 切到 codex/region-docs，基于当前待审 PR 内容；主 agent 负责架构与运行时实现。
+
+- schema.sql：保留 CRLF，新增 wl_CommentRegion(comment_id, country, region, city) 与评论的 ON DELETE CASCADE 外键。
+- src/utils/region.ts：规范化可用位置、公开/管理格式、事务插入语句和批量读取。
+- src/router/comment.ts：从新评论的原始 cf 创建记录，事务保存，统一响应按地区开关读取作者位置。
+- src/router/db.ts：导入导出可选 cfRegion 并允许管理员更新/清空元数据；有效插入ID来自 D1 执行结果。
+- test/region.test.ts：新增18项 Workers/D1验证；test/overture/runtime-smoke.mjs：打包后检查持久化与读取者位置隔离。
+- corepack pnpm exec tsc --noEmit：通过。
+- corepack pnpm run test：14文件、186测试通过。
+- corepack pnpm run test:overture：干跑构建、3项包校验、打包运行时验证通过。
+- corepack pnpm exec biome check --write：修改文件无错误；保留既有 RSS 非空断言警告。
+- 审阅文档子 agent 提交 8ee7377 后，本地整合为 4cbc5a5，替换旧地区无效说明并加入升级顺序。
+- 交付前再次 fetch：origin/main 仍 f162285；主干 active PR规则未变化，仍需1个批准。原检出和其他工作区保持不变。

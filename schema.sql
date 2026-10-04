@@ -29,6 +29,13 @@ CREATE INDEX IF NOT EXISTS "idx_comment_pid" ON "wl_Comment" ("pid");
 CREATE INDEX IF NOT EXISTS "idx_comment_user_id" ON "wl_Comment" ("user_id");
 CREATE INDEX IF NOT EXISTS "idx_comment_insertedAt" ON "wl_Comment" ("insertedAt");
 
+CREATE TABLE IF NOT EXISTS "wl_CommentRegion" (
+  "comment_id" INTEGER PRIMARY KEY REFERENCES "wl_Comment" ("id") ON DELETE CASCADE,
+  "country" TEXT NOT NULL DEFAULT '',
+  "region" TEXT NOT NULL DEFAULT '',
+  "city" TEXT NOT NULL DEFAULT ''
+);
+
 CREATE TABLE IF NOT EXISTS "wl_Counter" (
   "id" INTEGER PRIMARY KEY AUTOINCREMENT,
   "time" INTEGER DEFAULT 0,

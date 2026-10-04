@@ -19,3 +19,20 @@
 - 最新官方 Workers types 5.20261004.1 已下载到临时目录核对 D1 prepare/bind/all/first API；项目保留锁定依赖，不为新增字符串变量扩展类型生成重构。
 - 文档子 agent 在专用 worktree 本地提交；主 agent 修正文案中把 AVATAR_PROXY=true 和 Worker 转发图片的错误说法，最终审阅提交 940d5bb 后 cherry-pick 为 3dd7134。
 - main 未启用旧式 branch protection，但 active ruleset Main Protect 生效，要求 PR、1 个批准与 code-owner 审核；不得直接推送 main 或绕过规则。
+
+## 地区范围跟进（2026-10-04）
+
+- 用户提出使用 CF 识别实现地区；在原 PR 中补齐地区显示，原来的不实现地区范围已被该补充要求替代。
+- 官方 Request 文档证实 request.cf 的 country、region、city 来源于访问者 IP，可为空，Dashboard/Playground 预览不提供 cf：https://developers.cloudflare.com/workers/runtime-apis/request/#incomingrequestcfproperties 。
+- 在提交评论时获取 cf 并持久化，不能在 GET 时用读取者的 cf 给所有评论定位。不读取客户端请求体或可伪造地理请求头。
+- 新增独立 wl_CommentRegion 表，以 comment_id 主键和 ON DELETE CASCADE 引用评论。幂等 schema 重放能为现有数据库创建表，不修改既有评论列，不加旧接口兼容层/自动运行时 migration。
+- 新评论与地区在同一 D1 batch 事务写入；公开 addr 输出国家代码和省区，管理员列表可加城市，与上游一致，管理员可在 DISABLE_REGION=true 时仍查看。缺失地区不输出 addr。
+- 原有评论无法从未来的 request.cf 恢复作者位置，保持无地区；不会把阅读者位置或空值伪造成作者位置。
+- Waline 管理面板备份中的 Comment.cfRegion 承载可选结构化元数据，导入和更新时恢复；删除评论和清空表通过外键联动删除地区。
+
+- 独立地区表选择理由：直接新增 wl_Comment 列需要为已经存在的表额外 ALTER/migration 分支；独立表可由现有部署流程的 CREATE IF NOT EXISTS 无损创建，且不破坏 Waline SQLite 主表格式。
+- 补齐 raw cf 信息的可信边界：仅评论 POST 的 c.req.raw.cf 写入；公开请求体 cfRegion/addr 与 CF-IPCountry/CF-Region/CF-IPCity 头均不作为位置来源。管理员 DB import 则允许导入备份 cfRegion。
+- 验证管理面板迁移代码：packages/admin/src/pages/migration/index.jsx 复制 Comment 对象并调整关系字段，保留 cfRegion 字段，因此扩展元数据能穿过现有导入路径。
+- D1 事务插入使用同批次 last_insert_rowid() 绑定元数据，响应按第一条结果的 meta.last_row_id 取评论，避免跨请求从连接读取最后插入ID。故障触发器验证元数据失败时父评论同事务回滚。
+- 测试18个地区用例全部通过：来源持久化、阅读者位置不覆盖、根/回复/最近/写入/更新、公开隐私与管理员城市、关闭/启用值、未知CF字段/旧评论、schema重放、备份、删除、错误回滚。
+- 打包运行时也注入不同作者/阅读者 cf，确认发布包内实现保存作者位置；本次仍未在生产边缘部署或声称已部署。
