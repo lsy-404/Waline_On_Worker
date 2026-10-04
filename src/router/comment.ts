@@ -1,7 +1,8 @@
 import { Hono } from "hono";
 import type { Env, Variables } from "../env.js";
 import { checkAkismet } from "../utils/akismet.js";
-import { getAvatar } from "../utils/avatar.js";
+import { getAvatar, proxyAvatar } from "../utils/avatar.js";
+import { getLevel, isEnabled, parseLevels } from "../utils/display.js";
 import { reviewComment } from "../utils/llm-review.js";
 import { renderMarkdown } from "../utils/markdown.js";
 import { parseUA } from "../utils/ua.js";
@@ -168,7 +169,7 @@ commentRoutes.post("/", async (c) => {
 		{
 			errno: 0,
 			errmsg: "",
-			data: await formatComment(newComment),
+			data: (await formatComments([newComment], c.env))[0],
 		},
 		201,
 	);
@@ -197,7 +198,11 @@ commentRoutes.put("/:id", async (c) => {
 			.bind(id)
 			.first();
 
-		return c.json({ errno: 0, errmsg: "", data: await formatComment(updated) });
+		return c.json({
+			errno: 0,
+			errmsg: "",
+			data: (await formatComments([updated], c.env))[0],
+		});
 	}
 
 	// Only admin can update other fields
@@ -282,7 +287,11 @@ commentRoutes.put("/:id", async (c) => {
 		.bind(id)
 		.first();
 
-	return c.json({ errno: 0, errmsg: "", data: await formatComment(updated) });
+	return c.json({
+		errno: 0,
+		errmsg: "",
+		data: (await formatComments([updated], c.env))[0],
+	});
 });
 
 /**
@@ -494,23 +503,19 @@ async function getCommentList(c: any) {
 		children = childResult.results;
 	}
 
-	// Pre-fetch all users for roots and children to avoid repeated DB lookups
-	const userMap = await fetchCommentUsers(c.env.DB, [
-		...rootComments.results,
-		...children,
-	]);
-
-	// Build threaded structure
-	const data = await Promise.all(
-		rootComments.results.map(async (root: any) => ({
-			...(await formatComment(root, false, userMap)),
-			children: await Promise.all(
-				children
-					.filter((child: any) => child.rid === root.id)
-					.map((child: any) => formatComment(child, false, userMap)),
-			),
-		})),
+	const formatted = await formatComments(
+		[...rootComments.results, ...children],
+		c.env,
 	);
+	const commentsById = new Map(
+		formatted.filter((row) => row !== null).map((row) => [row.objectId, row]),
+	);
+	const data = rootComments.results.map((root: any) => ({
+		...commentsById.get(root.id),
+		children: children
+			.filter((child: any) => child.rid === root.id)
+			.map((child: any) => commentsById.get(child.id)),
+	}));
 
 	return c.json({
 		errno: 0,
@@ -538,13 +543,10 @@ async function getRecentComments(c: any) {
 		.bind(count)
 		.all();
 
-	const userMap = await fetchCommentUsers(c.env.DB, result.results);
 	return c.json({
 		errno: 0,
 		errmsg: "",
-		data: await Promise.all(
-			result.results.map((r: any) => formatComment(r, false, userMap)),
-		),
+		data: await formatComments(result.results, c.env),
 	});
 }
 
@@ -632,7 +634,6 @@ async function getAdminCommentList(c: any) {
 		.bind(...params, pageSize, offset)
 		.all();
 
-	const userMap = await fetchCommentUsers(c.env.DB, result.results);
 	return c.json({
 		errno: 0,
 		errmsg: "",
@@ -642,9 +643,7 @@ async function getAdminCommentList(c: any) {
 			spamCount: 0,
 			waitingCount: 0,
 			totalPages: Math.ceil(((countResult?.count as number) || 0) / pageSize),
-			data: await Promise.all(
-				result.results.map((r: any) => formatComment(r, true, userMap)),
-			),
+			data: await formatComments(result.results, c.env, true),
 		},
 	});
 }
@@ -751,33 +750,71 @@ async function runSpamReview(opts: {
 		.run();
 }
 
-/**
- * Internal: helper to fetch users for a list of comments to avoid N+1 queries.
- */
-async function fetchCommentUsers(
-	db: D1Database,
-	rows: any[],
-): Promise<Map<number, any>> {
-	const userIds = [...new Set(rows.map((r) => r.user_id).filter(Boolean))];
+async function formatComments(rows: any[], env: Env, isAdmin = false) {
+	const comments = rows.filter(Boolean);
+	const userIds = [
+		...new Set<number>(comments.map((row) => row.user_id).filter(Boolean)),
+	];
 	const userMap = new Map<number, any>();
-	if (userIds.length === 0) return userMap;
-
-	const placeholders = userIds.map(() => "?").join(",");
-	const result = await db
-		.prepare(
-			`SELECT id, display_name, email, type, url, avatar, label FROM wl_Users WHERE id IN (${placeholders})`,
+	for (let offset = 0; offset < userIds.length; offset += 100) {
+		const ids = userIds.slice(offset, offset + 100);
+		const result = await env.DB.prepare(
+			`SELECT id, display_name, email, type, url, avatar, label FROM wl_Users WHERE id IN (${ids.map(() => "?").join(",")})`,
 		)
-		.bind(...userIds)
-		.all();
-
-	for (const user of result.results) {
-		userMap.set((user as any).id, user);
+			.bind(...ids)
+			.all();
+		for (const user of result.results) userMap.set(user.id as number, user);
 	}
-	return userMap;
+
+	const levels = parseLevels(env.LEVELS);
+	const userCounts = new Map<number, number>();
+	const mailCounts = new Map<string, number>();
+	if (levels) {
+		const mails = [
+			...new Set<string>(
+				comments
+					.filter((row) => !row.user_id)
+					.map((row) => row.mail)
+					.filter(Boolean),
+			),
+		];
+		for (const [column, values] of [
+			["user_id", userIds],
+			["mail", mails],
+		] as const) {
+			for (let offset = 0; offset < values.length; offset += 100) {
+				const batch = values.slice(offset, offset + 100);
+				const result = await env.DB.prepare(
+					`SELECT ${column} AS identity, COUNT(*) AS count FROM wl_Comment WHERE status = 'approved' AND ${column} IN (${batch.map(() => "?").join(",")}) GROUP BY ${column}`,
+				)
+					.bind(...batch)
+					.all();
+				for (const row of result.results) {
+					if (column === "user_id")
+						userCounts.set(row.identity as number, row.count as number);
+					else mailCounts.set(row.identity as string, row.count as number);
+				}
+			}
+		}
+	}
+
+	return Promise.all(
+		rows.map(async (row) => {
+			const result = await formatComment(row, env, isAdmin, userMap);
+			if (result && levels) {
+				const count = row.user_id
+					? userCounts.get(row.user_id)
+					: mailCounts.get(row.mail);
+				result.level = getLevel(count || 0, levels);
+			}
+			return result;
+		}),
+	);
 }
 
 async function formatComment(
 	row: any,
+	env: Env,
 	isAdmin = false,
 	userMap?: Map<number, any>,
 ) {
@@ -788,8 +825,10 @@ async function formatComment(
 	const mail = user?.email || row.mail || "";
 	const link = user?.url || row.link || "";
 
-	const { browser, os } = parseUA(row.ua || "");
-	const avatar = user?.avatar || (await getAvatar(mail));
+	const avatar = proxyAvatar(
+		user?.avatar || (await getAvatar(mail)),
+		env.AVATAR_PROXY,
+	);
 
 	// Gracefully handle null timestamps and ensure standard ISO format.
 	// legacy data might have numeric timestamps or strings with space.
@@ -816,8 +855,6 @@ async function formatComment(
 		nick,
 		link,
 		avatar,
-		browser,
-		os,
 		time: Number.isNaN(time) ? 0 : time,
 		insertedAt: isoDate,
 		createdAt: isoDate,
@@ -831,6 +868,10 @@ async function formatComment(
 		type: user?.type || (row.user_id ? "guest" : ""),
 		label: user?.label || "",
 	};
+
+	if (!isEnabled(env.DISABLE_USERAGENT ?? env.DISABLE_AGENT)) {
+		Object.assign(result, parseUA(row.ua || ""));
+	}
 
 	if (isAdmin) {
 		result.mail = mail;

@@ -13,12 +13,12 @@
     "jsx": "react-jsx",
     "jsxImportSource": "hono/jsx",
     "lib": ["ESNext"],
-    "types": ["@cloudflare/workers-types"],
+    "types": ["@cloudflare/workers-types", "@cloudflare/vitest-pool-workers/types"],
     "paths": {
       "@/*": ["./src/*"],
       "@tests/*": ["./tests/*"]
     }
   },
-  "include": ["src/**/*.ts", "tests/**/*.ts"],
+  "include": ["src/**/*.ts", "tests/**/*.ts", "test/**/*.ts"],
   "exclude": ["node_modules", "waline"],
 }

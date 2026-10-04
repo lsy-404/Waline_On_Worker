@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { Env, Variables } from "../env.js";
-import { getAvatar } from "../utils/avatar.js";
+import { getAvatar, proxyAvatar } from "../utils/avatar.js";
+import { getLevel, parseLevels } from "../utils/display.js";
 import { hashPassword } from "../utils/password.js";
 
 export const userRoutes = new Hono<{
@@ -62,7 +63,9 @@ userRoutes.get("/", async (c) => {
 				page,
 				pageSize,
 				totalPages: Math.ceil(total / pageSize),
-				data: await Promise.all(result.results.map((u: any) => formatUser(u))),
+				data: await Promise.all(
+					result.results.map((u: any) => formatUser(u, c.env)),
+				),
 			},
 		});
 	}
@@ -73,7 +76,7 @@ userRoutes.get("/", async (c) => {
 		Math.max(1, parseInt(c.req.query("count") || "10", 10) || 10),
 	);
 	const result = await c.env.DB.prepare(
-		`SELECT u.id, u.display_name, u.url, u.avatar, u.label,
+		`SELECT u.id, u.display_name, u.email, u.url, u.avatar, u.label,
             COUNT(c.id) as comment_count
      FROM wl_Users u
      LEFT JOIN wl_Comment c ON c.user_id = u.id AND c.status = 'approved'
@@ -84,17 +87,24 @@ userRoutes.get("/", async (c) => {
 		.bind(count)
 		.all();
 
+	const levels = parseLevels(c.env.LEVELS);
 	return c.json({
 		errno: 0,
 		errmsg: "",
-		data: result.results.map((u: any) => ({
-			objectId: u.id,
-			display_name: u.display_name,
-			url: u.url || "",
-			avatar: u.avatar || "",
-			label: u.label || "",
-			count: u.comment_count,
-		})),
+		data: await Promise.all(
+			result.results.map(async (u: any) => ({
+				objectId: u.id,
+				display_name: u.display_name,
+				url: u.url || "",
+				avatar: proxyAvatar(
+					u.avatar || (await getAvatar(u.email || "")),
+					c.env.AVATAR_PROXY,
+				),
+				label: u.label || "",
+				count: u.comment_count,
+				...(levels ? { level: getLevel(u.comment_count, levels) } : {}),
+			})),
+		),
 	});
 });
 
@@ -151,7 +161,7 @@ userRoutes.post("/", async (c) => {
 		{
 			errno: 0,
 			errmsg: "",
-			data: await formatUser(newUser),
+			data: await formatUser(newUser, c.env),
 		},
 		201,
 	);
@@ -217,7 +227,11 @@ userRoutes.put("/:id", async (c) => {
 		.bind(id)
 		.first();
 
-	return c.json({ errno: 0, errmsg: "", data: await formatUser(updated) });
+	return c.json({
+		errno: 0,
+		errmsg: "",
+		data: await formatUser(updated, c.env),
+	});
 });
 
 /**
@@ -260,7 +274,7 @@ userRoutes.delete("/:id", async (c) => {
 	return c.json({ errno: 0, errmsg: "" });
 });
 
-async function formatUser(row: any) {
+async function formatUser(row: any, env: Env) {
 	if (!row) return null;
 	return {
 		objectId: row.id,
@@ -268,7 +282,10 @@ async function formatUser(row: any) {
 		email: row.email || "",
 		type: row.type || "guest",
 		url: row.url || "",
-		avatar: row.avatar || (await getAvatar(row.email || "")),
+		avatar: proxyAvatar(
+			row.avatar || (await getAvatar(row.email || "")),
+			env.AVATAR_PROXY,
+		),
 		label: row.label || "",
 	};
 }
