@@ -568,7 +568,8 @@ async function getRecentComments(c: any) {
 }
 
 async function getCommentCount(c: any) {
-	const paths = c.req.queries("path") || c.req.queries("path[]") || [];
+	const paths = c.req.queries("path") || c.req.queries("path[]") ||
+		(c.req.query("url") ? c.req.query("url").split(",") : []);
 	if (paths.length === 0) {
 		return c.json({ errno: 0, errmsg: "", data: 0 });
 	}
