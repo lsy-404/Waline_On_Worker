@@ -181,11 +181,35 @@ userRoutes.put("/", async (c) => {
 	const body = await c.req.json();
 	const updates: string[] = [];
 	const values: unknown[] = [];
+	const isAdmin = userInfo.type === "administrator";
 
-	for (const field of ["display_name", "url", "avatar", "label"]) {
+	for (const field of [
+		"display_name",
+		"url",
+		"avatar",
+		...(isAdmin ? ["label"] : []),
+	]) {
 		if (body[field] !== undefined) {
 			updates.push(`${field} = ?`);
 			values.push(body[field]);
+		}
+	}
+	if (body.email !== undefined) {
+		const email = typeof body.email === "string" ? body.email.trim() : "";
+		if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+			return c.json({ errno: 1, errmsg: "Invalid email" }, 400);
+		}
+		if (email.toLowerCase() !== userInfo.email.toLowerCase()) {
+			const existing = await c.env.DB.prepare(
+				"SELECT id FROM wl_Users WHERE lower(email) = lower(?) AND id != ?",
+			)
+				.bind(email, userInfo.objectId)
+				.first();
+			if (existing) {
+				return c.json({ errno: 1, errmsg: "Email already in use" }, 409);
+			}
+			updates.push("email = ?");
+			values.push(email);
 		}
 	}
 	if (typeof body.password === "string" && body.password.length > 0) {
@@ -242,7 +266,8 @@ userRoutes.put("/:id", async (c) => {
 	const updates: string[] = [];
 	const values: unknown[] = [];
 
-	const allowedFields = ["display_name", "url", "avatar", "label"];
+	const allowedFields = ["display_name", "url", "avatar"];
+	if (isAdmin) allowedFields.push("label");
 	for (const field of allowedFields) {
 		if (body[field] !== undefined) {
 			updates.push(`${field} = ?`);
