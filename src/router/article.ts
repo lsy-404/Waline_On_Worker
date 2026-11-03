@@ -83,36 +83,14 @@ articleRoutes.post("/", async (c) => {
 	if (!VALID_FIELDS.has(type)) {
 		return c.json({ errno: 1, errmsg: "invalid type" }, 400);
 	}
-
-	const existing = await c.env.DB.prepare(
-		"SELECT * FROM wl_Counter WHERE url = ?",
-	)
-		.bind(path)
-		.first();
-
-	if (!existing) {
-		if (action === "desc") {
-			return c.json({ errno: 0, errmsg: "", data: [{ [type]: 0 }] });
-		}
-
-		await c.env.DB.prepare(
-			`INSERT INTO wl_Counter (url, ${type}) VALUES (?, 1)`,
-		)
-			.bind(path)
-			.run();
-
-		return c.json({ errno: 0, errmsg: "", data: [{ [type]: 1 }] });
+	if ((action !== "inc" && action !== "desc") || (type === "time" && action !== "inc")) {
+		return c.json({ errno: 1, errmsg: "invalid action" }, 400);
 	}
-
-	const currentVal = (existing as any)[type] || 0;
-	const newVal =
-		action === "desc" ? Math.max(0, currentVal - 1) : currentVal + 1;
-
-	await c.env.DB.prepare(
-		`UPDATE wl_Counter SET ${type} = ?, updatedAt = datetime('now') WHERE url = ?`,
-	)
-		.bind(newVal, path)
-		.run();
-
-	return c.json({ errno: 0, errmsg: "", data: [{ [type]: newVal }] });
+	const delta = action === "desc" ? -1 : 1;
+	const result = await c.env.DB.prepare(
+		`INSERT INTO wl_Counter (url, ${type}) VALUES (?, max(0, ?))
+		 ON CONFLICT(url) DO UPDATE SET ${type} = max(0, ${type} + ?), updatedAt = datetime('now')
+		 RETURNING ${type}`,
+	).bind(path, delta, delta).first();
+	return c.json({ errno: 0, errmsg: "", data: [{ [type]: result?.[type] ?? 0 }] });
 });
