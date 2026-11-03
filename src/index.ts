@@ -100,9 +100,13 @@ app.get("/ui/worker-setting", async (c) => {
 
 // Admin panel UI (original @waline/admin from CDN)
 app.get("/ui", async (c) => {
+	c.header("Cache-Control", "no-store");
+	c.header("Referrer-Policy", "no-referrer");
 	return c.html(await getAdminPage(c.env, c.req.url));
 });
 app.get("/ui/*", async (c) => {
+	c.header("Cache-Control", "no-store");
+	c.header("Referrer-Policy", "no-referrer");
 	return c.html(await getAdminPage(c.env, c.req.url));
 });
 
