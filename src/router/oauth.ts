@@ -144,6 +144,12 @@ oauthRoutes.get("/", async (c) => {
 
 		// Create new user if not found
 		if (!user) {
+			if (c.env.DISABLE_REGISTRATION === "true") {
+				const callback = new URL(redirect, c.req.url);
+				callback.searchParams.set("error", "registration_disabled");
+				return c.redirect(callback.toString());
+			}
+
 			const userCount = await c.env.DB.prepare(
 				"SELECT COUNT(*) as count FROM wl_Users",
 			).first();

@@ -78,6 +78,27 @@ ${showWorker ? `  <style>.wk-badge{display:inline-block;margin-right:8px;padding
   })();
   </script>
   <script src="${adminScript}"></script>
+  <script>
+  (function(){
+    var attempts = 0;
+    var timer = setInterval(function(){
+      var params = new URLSearchParams(location.search);
+      if (!params.has('token')) { clearInterval(timer); return; }
+      var hasStoredToken = Boolean(window.TOKEN);
+      try {
+        hasStoredToken = hasStoredToken || Boolean(sessionStorage.getItem('TOKEN')) || Boolean(localStorage.getItem('TOKEN'));
+      } catch (_) {}
+      if (hasStoredToken) {
+        params.delete('token');
+        var query = params.toString();
+        history.replaceState(history.state, '', location.pathname + (query ? '?' + query : '') + location.hash);
+        clearInterval(timer);
+      } else if (++attempts >= 100) {
+        clearInterval(timer);
+      }
+    }, 20);
+  })();
+  </script>
 ${
 	showWorker
 		? `  <script>

@@ -1,0 +1,33 @@
+name = "waline-blog-production"
+main = "src/index.ts"
+compatibility_date = "2026-06-03"
+workers_dev = true
+preview_urls = false
+
+[vars]
+DISABLE_REGISTRATION = "true"
+SITE_NAME = "川流不息"
+SITE_URL = "https://blog.weenas.com"
+SECURE_DOMAINS = "https://blog.weenas.com"
+AUDIT = "true"
+DISABLE_REGION = "true"
+DISABLE_USERAGENT = "true"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "waline-blog-production"
+database_id = "1f9fb112-d82f-4b00-94f0-7cad32d383ce"
+
+[[ratelimits]]
+name = "WRITE_LIMITER"
+namespace_id = "32064101"
+simple = { limit = 12, period = 60 }
+
+[[ratelimits]]
+name = "LOGIN_LIMITER"
+namespace_id = "32064102"
+simple = { limit = 5, period = 60 }
+
+[[routes]]
+pattern = "waline.weenas.com"
+custom_domain = true

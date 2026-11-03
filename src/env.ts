@@ -4,6 +4,10 @@ export interface Env {
 
 	// Environment variables
 	JWT_SECRET?: string;
+	TRIAL_READ_ONLY?: string;
+	DISABLE_REGISTRATION?: string;
+	WRITE_LIMITER?: { limit: (options: { key: string }) => Promise<{ success: boolean }> };
+	LOGIN_LIMITER?: { limit: (options: { key: string }) => Promise<{ success: boolean }> };
 	SITE_NAME?: string;
 	SITE_URL?: string;
 	SECURE_DOMAINS?: string;

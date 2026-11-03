@@ -176,11 +176,17 @@ commentRoutes.post("/", async (c) => {
 		);
 	}
 
+	const formattedComment = (await formatComments([newComment], c.env))[0];
+	// Waline's client detects replies by the presence of `rid`, not its value.
+	if (formattedComment && formattedComment.rid == null) {
+		delete (formattedComment as any).rid;
+	}
+
 	return c.json(
 		{
 			errno: 0,
 			errmsg: "",
-			data: (await formatComments([newComment], c.env))[0],
+			data: formattedComment,
 		},
 		201,
 	);
@@ -562,7 +568,8 @@ async function getRecentComments(c: any) {
 }
 
 async function getCommentCount(c: any) {
-	const paths = c.req.queries("path") || c.req.queries("path[]") || [];
+	const paths = c.req.queries("path") || c.req.queries("path[]") ||
+		(c.req.query("url") ? c.req.query("url").split(",") : []);
 	if (paths.length === 0) {
 		return c.json({ errno: 0, errmsg: "", data: 0 });
 	}
