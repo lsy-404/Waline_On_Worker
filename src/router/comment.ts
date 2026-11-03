@@ -176,11 +176,17 @@ commentRoutes.post("/", async (c) => {
 		);
 	}
 
+	const formattedComment = (await formatComments([newComment], c.env))[0];
+	// Waline's client detects replies by the presence of `rid`, not its value.
+	if (formattedComment && formattedComment.rid == null) {
+		delete (formattedComment as any).rid;
+	}
+
 	return c.json(
 		{
 			errno: 0,
 			errmsg: "",
-			data: (await formatComments([newComment], c.env))[0],
+			data: formattedComment,
 		},
 		201,
 	);
