@@ -27,3 +27,7 @@ simple = { limit = 12, period = 60 }
 name = "LOGIN_LIMITER"
 namespace_id = "32064102"
 simple = { limit = 5, period = 60 }
+
+[[routes]]
+pattern = "waline.weenas.com"
+custom_domain = true
