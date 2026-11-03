@@ -170,6 +170,55 @@ userRoutes.post("/", async (c) => {
 /**
  * PUT /api/user/:id - Update user profile
  */
+userRoutes.put("/", async (c) => {
+	const userInfo = c.get("userInfo");
+
+	if (!userInfo) {
+		return c.json({ errno: 1, errmsg: "Unauthorized" }, 401);
+	}
+
+	// Waline's profile page updates the current user through PUT /api/user.
+	const body = await c.req.json();
+	const updates: string[] = [];
+	const values: unknown[] = [];
+
+	for (const field of ["display_name", "url", "avatar", "label"]) {
+		if (body[field] !== undefined) {
+			updates.push(`${field} = ?`);
+			values.push(body[field]);
+		}
+	}
+
+	if (updates.length === 0) {
+		return c.json({ errno: 1, errmsg: "No fields to update" }, 400);
+	}
+
+	updates.push("updatedAt = datetime('now')");
+	values.push(userInfo.objectId);
+
+	await c.env.DB.prepare(
+		`UPDATE wl_Users SET ${updates.join(", ")} WHERE id = ?`,
+	)
+		.bind(...values)
+		.run();
+
+	const updated = await c.env.DB.prepare(
+		"SELECT id, display_name, email, type, url, avatar, label FROM wl_Users WHERE id = ?",
+	)
+		.bind(userInfo.objectId)
+		.first();
+
+	if (!updated) {
+		return c.json({ errno: 1, errmsg: "User not found" }, 404);
+	}
+
+	return c.json({
+		errno: 0,
+		errmsg: "",
+		data: await formatUser(updated, c.env),
+	});
+});
+
 userRoutes.put("/:id", async (c) => {
 	const id = c.req.param("id");
 	const userInfo = c.get("userInfo");
