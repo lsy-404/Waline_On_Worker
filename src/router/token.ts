@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import type { Context } from "hono";
 import type { Env, Variables } from "../env.js";
 import { signJwt } from "../middleware/auth.js";
 import { getAvatar, proxyAvatar } from "../utils/avatar.js";
@@ -11,10 +12,12 @@ export const tokenRoutes = new Hono<{
 	Variables: Variables;
 }>();
 
+type TokenContext = Context<{ Bindings: Env; Variables: Variables }>;
+
 /**
  * GET /api/token - Get current user info
  */
-tokenRoutes.get("/", async (c) => {
+export const getCurrentUser = async (c: TokenContext) => {
 	const userInfo = c.get("userInfo");
 	if (!userInfo) {
 		return c.json({ errno: 1, errmsg: "Unauthorized" }, 401);
@@ -44,7 +47,9 @@ tokenRoutes.get("/", async (c) => {
 			mailMd5: await md5(userInfo.email.toLowerCase()),
 		},
 	});
-});
+};
+
+tokenRoutes.get("/", getCurrentUser);
 
 /**
  * POST /api/token - Login

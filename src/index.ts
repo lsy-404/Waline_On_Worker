@@ -7,7 +7,7 @@ import { commentRoutes } from "./router/comment.js";
 import { dbRoutes } from "./router/db.js";
 import { oauthRoutes } from "./router/oauth.js";
 import { settingsRoutes } from "./router/settings.js";
-import { tokenRoutes } from "./router/token.js";
+import { getCurrentUser, tokenRoutes } from "./router/token.js";
 import { userRoutes } from "./router/user.js";
 import { getAdminPage } from "./ui/admin-panel.js";
 import { getCustomSettingsPage } from "./ui/custom-admin.js";
@@ -87,6 +87,8 @@ app.route("/api/comment", commentRoutes);
 app.route("/api/article", articleRoutes);
 app.route("/api/user", userRoutes);
 app.route("/api/token", tokenRoutes);
+// Waline's mobile login callback validates the returned token at /token.
+app.get("/token", getCurrentUser);
 app.route("/api/settings", settingsRoutes);
 app.route("/api/oauth", oauthRoutes);
 app.route("/api/db", dbRoutes);
