@@ -188,6 +188,10 @@ userRoutes.put("/", async (c) => {
 			values.push(body[field]);
 		}
 	}
+	if (typeof body.password === "string" && body.password.length > 0) {
+		updates.push("password = ?");
+		values.push(await hashPassword(body.password));
+	}
 
 	if (updates.length === 0) {
 		return c.json({ errno: 1, errmsg: "No fields to update" }, 400);
