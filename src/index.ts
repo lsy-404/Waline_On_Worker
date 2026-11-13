@@ -22,13 +22,21 @@ app.use(
 		origin: (origin, c) => {
 			const secureDomains = c.env.SECURE_DOMAINS;
 			if (!secureDomains) return origin;
-			const allowed = secureDomains.split(",").map((d: string) => d.trim());
-			if (
-				allowed.some((d: string) => origin === d || origin.endsWith(`.${d}`))
-			) {
-				return origin;
+			if (!origin) return "";
+			let host: string;
+			let hostname: string;
+			try {
+				const url = new URL(origin);
+				host = url.host;
+				hostname = url.hostname;
+			} catch {
+				return "";
 			}
-			return "";
+			const allowed = secureDomains.split(",").map((d: string) => d.trim());
+			const matched = allowed.some((d: string) =>
+				d.includes(":") ? host === d : hostname === d || hostname.endsWith(`.${d}`),
+			);
+			return matched ? origin : "";
 		},
 		allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
 		allowHeaders: ["Content-Type", "Authorization"],
